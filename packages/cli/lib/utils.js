@@ -10,6 +10,8 @@ const fs = require('fs');
 const path = require('path');
 const util = require('util');
 const stream = require('stream');
+const readline = require('readline');
+const chalk = require('chalk');
 var semver = require('semver');
 const regenerate = require('regenerate');
 const _ = require('lodash');
@@ -294,4 +296,47 @@ exports.validateStringObject = function(type) {
 
     return true;
   };
+};
+
+/**
+ * Use readline to read text from stdin
+ * @param {*} log An optional log
+ */
+exports.readTextFromStdin = function(log) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+  });
+
+  const lines = [];
+  if (process.stdin.isTTY && log) {
+    log(
+      chalk.green(
+        'Please type in a json object line by line ' +
+          '(Press <ctrl>-D or type EOF to end):',
+      ),
+    );
+  }
+
+  let err;
+  return new Promise((resolve, reject) => {
+    rl.on('SIGINT', () => {
+      err = new Error('Canceled by user');
+      rl.close();
+    })
+      .on('line', line => {
+        if (line === 'EOF') {
+          rl.close();
+        } else {
+          lines.push(line);
+        }
+      })
+      .on('close', () => {
+        if (err) reject(err);
+        else resolve(lines.join('\n'));
+      })
+      .on('error', e => {
+        err = e;
+        rl.close();
+      });
+  });
 };
