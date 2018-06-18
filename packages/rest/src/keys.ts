@@ -51,6 +51,14 @@ export namespace RestBindings {
    */
   export const PROTOCOL = BindingKey.create<'http' | 'https'>('rest.protocol');
   /**
+   * Binding key for location of TLS key
+   */
+  export const KEY = BindingKey.create<string | undefined>('rest.key');
+  /**
+   * Binding key for location of TLS certificate
+   */
+  export const CERT = BindingKey.create<string | undefined>('rest.cert');
+  /**
    * Internal binding key for http-handler
    */
   export const HANDLER = BindingKey.create<HttpHandler>('rest.handler');

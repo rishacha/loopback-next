@@ -163,6 +163,8 @@ export class RestServer extends Context implements Server, HttpServerLike {
     this.bind(RestBindings.PORT).to(options.port);
     this.bind(RestBindings.HOST).to(options.host);
     this.bind(RestBindings.PROTOCOL).to(options.protocol || 'http');
+    this.bind(RestBindings.KEY).to(options.key);
+    this.bind(RestBindings.CERT).to(options.cert);
 
     if (options.sequence) {
       this.sequence(options.sequence);
@@ -582,11 +584,15 @@ export class RestServer extends Context implements Server, HttpServerLike {
     const protocol = await this.get<'http' | 'https' | undefined>(
       RestBindings.PROTOCOL,
     );
+    const key = await this.get<string | undefined>(RestBindings.KEY);
+    const cert = await this.get<string | undefined>(RestBindings.CERT);
 
     this._httpServer = new HttpServer(this.requestHandler, {
       port: port,
       host: host,
       protocol: protocol || 'http',
+      key: key,
+      cert: cert,
     });
 
     await this._httpServer.start();
@@ -636,4 +642,6 @@ export interface RestServerConfig {
   apiExplorerUrl?: string;
   sequence?: Constructor<SequenceHandler>;
   protocol?: 'http' | 'https';
+  key?: string;
+  cert?: string;
 }
