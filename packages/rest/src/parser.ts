@@ -15,8 +15,11 @@ import {promisify} from 'util';
 import {OperationArgs, Request, PathParameterValues} from './types';
 import {ResolvedRoute} from './router/routing-table';
 import {coerceParameter} from './coercion/coerce-parameter';
+import {validateRequestBody} from './validation/request-body.validator';
 import {RestHttpErrors} from './index';
 type HttpError = HttpErrors.HttpError;
+import * as debugModule from 'debug';
+const debug = debugModule('loopback:rest:parser');
 
 // tslint:disable-next-line:no-any
 type MaybeBody = any | undefined;
@@ -107,6 +110,8 @@ function buildOperationArguments(
     const coercedValue = coerceParameter(rawValue, spec);
     paramArgs.push(coercedValue);
   }
+  debug('start to validate requestBody...');
+  validateRequestBody(body, operationSpec.requestBody);
   if (requestBodyIndex > -1) paramArgs.splice(requestBodyIndex, 0, body);
   return paramArgs;
 }

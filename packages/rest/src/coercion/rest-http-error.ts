@@ -12,4 +12,11 @@ export namespace RestHttpErrors {
     const msg = `Parameters with "in: ${location}" are not supported yet.`;
     return new HttpErrors.NotImplemented(msg);
   }
+  export function invalidRequestBody(
+    // tslint:disable-next-line:no-any
+    body: any,
+    msg: string,
+  ): HttpErrors.HttpError {
+    return new HttpErrors.UnprocessableEntity(msg);
+  }
 }

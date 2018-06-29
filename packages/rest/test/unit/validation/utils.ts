@@ -1,4 +1,4 @@
-import {OperationObject, ParameterObject} from '@loopback/openapi-v3-types';
+import {OperationObject, RequestBodyObject} from '@loopback/openapi-v3-types';
 
 import {
   ShotRequestOptions,
@@ -16,10 +16,10 @@ import {
 } from '../../..';
 import * as HttpErrors from 'http-errors';
 
-function givenOperationWithParameters(params?: ParameterObject[]) {
+function givenOperationWithRequestBody(requestBodySpec?: RequestBodyObject) {
   return <OperationObject>{
     'x-operation-name': 'testOp',
-    parameters: params,
+    requestBody: requestBodySpec,
     responses: {},
   };
 }
@@ -32,13 +32,13 @@ function givenResolvedRoute(
   spec: OperationObject,
   pathParams: PathParameterValues = {},
 ): ResolvedRoute {
-  const route = new Route('get', '/', spec, () => {});
+  const route = new Route('post', '/', spec, () => {});
   return createResolvedRoute(route, pathParams);
 }
 
 export interface TestArgs<T> {
-  paramSpec: ParameterObject;
-  rawValue: string | undefined | object;
+  body: object;
+  requestBodySpec: RequestBodyObject;
   expectedResult: T;
   caller: string;
   expectError: boolean;
@@ -49,12 +49,12 @@ export type TestOptions = {
   testName?: string;
 };
 
-export async function testCoercion<T>(config: TestArgs<T>) {
+export async function testValidation<T>(config: TestArgs<T>) {
   /* istanbul ignore next */
   try {
-    const req = givenRequest();
-    const spec = givenOperationWithParameters([config.paramSpec]);
-    const route = givenResolvedRoute(spec, {aparameter: config.rawValue});
+    const req = givenRequest({payload: config.body, url: '/'});
+    const spec = givenOperationWithRequestBody(config.requestBodySpec);
+    const route = givenResolvedRoute(spec);
 
     if (config.expectError) {
       await expect(parseOperationArgs(req, route)).to.be.rejectedWith(
@@ -71,19 +71,19 @@ export async function testCoercion<T>(config: TestArgs<T>) {
 }
 
 export function test<T>(
-  paramSpec: ParameterObject,
-  rawValue: string | undefined | object,
+  requestBodySpec: RequestBodyObject,
+  body: object,
   expectedResult: T,
   opts?: TestOptions,
 ) {
   const caller: string = new Error().stack!;
-  const DEFAULT_TEST_NAME = `convert request raw value ${rawValue} to ${expectedResult}`;
+  const DEFAULT_TEST_NAME = 'validation test';
   const testName = (opts && opts.testName) || DEFAULT_TEST_NAME;
 
   it(testName, async () => {
-    await testCoercion({
-      paramSpec,
-      rawValue,
+    await testValidation({
+      requestBodySpec,
+      body,
       expectedResult,
       caller,
       expectError: expectedResult instanceof HttpErrors.HttpError,
