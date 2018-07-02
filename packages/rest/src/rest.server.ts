@@ -36,6 +36,8 @@ import {RestBindings} from './keys';
 import {RequestContext} from './request-context';
 import * as express from 'express';
 
+const debug = require('debug')('loopback:rest:server');
+
 export type HttpRequestListener = (
   req: ServerRequest,
   res: ServerResponse,
@@ -251,8 +253,11 @@ export class RestServer extends Context implements Server, HttpServerLike {
       const apiSpec = getControllerSpec(ctor);
       if (!apiSpec) {
         // controller methods are specified through app.api() spec
+        debug('Skipping controller %s - no API spec provided', controllerName);
         continue;
       }
+
+      debug('Registering controller %s with spec %j', controllerName, apiSpec);
       if (apiSpec.components && apiSpec.components.schemas) {
         this._httpHandler.registerApiDefinitions(apiSpec.components.schemas);
       }

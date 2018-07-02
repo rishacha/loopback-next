@@ -7,6 +7,7 @@ import {
   OperationObject,
   ParameterObject,
   PathObject,
+  SchemasObject,
 } from '@loopback/openapi-v3-types';
 import {
   BindingScope,
@@ -28,7 +29,7 @@ import {
 import {ControllerSpec} from '@loopback/openapi-v3';
 
 import * as assert from 'assert';
-const debug = require('debug')('loopback:core:routing-table');
+const debug = require('debug')('loopback:rest:routing-table');
 
 // TODO(bajtos) Refactor this code to use Trie-based lookup,
 // e.g. via wayfarer/trie or find-my-way
@@ -204,6 +205,12 @@ export interface RouteEntry {
  */
 export interface ResolvedRoute extends RouteEntry {
   readonly pathParams: PathParameterValues;
+
+  /**
+   * Server/application wide schemas shared by multiple routes,
+   * e.g. model schemas.
+   */
+  readonly schemas: SchemasObject;
 }
 
 /**
@@ -285,6 +292,9 @@ export function createResolvedRoute(
     pathParams: {
       writable: false,
       value: pathParams,
+    },
+    schemas: {
+      value: {},
     },
   });
 }

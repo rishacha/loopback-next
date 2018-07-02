@@ -61,3 +61,5 @@ describe('validate request body - happy path', () => {
 });
 
 describe('validate request body - complicated', () => {});
+
+// TODO add test cases for optional vs. required request body

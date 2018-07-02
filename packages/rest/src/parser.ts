@@ -9,6 +9,7 @@ import {
   OperationObject,
   ParameterObject,
   isReferenceObject,
+  SchemasObject,
 } from '@loopback/openapi-v3-types';
 import {REQUEST_BODY_INDEX} from '@loopback/openapi-v3';
 import {promisify} from 'util';
@@ -55,10 +56,17 @@ export async function parseOperationArgs(
   request: Request,
   route: ResolvedRoute,
 ): Promise<OperationArgs> {
+  debug('Parsing operation arguments for route %s', route.describe());
   const operationSpec = route.spec;
   const pathParams = route.pathParams;
   const body = await loadRequestBodyIfNeeded(operationSpec, request);
-  return buildOperationArguments(operationSpec, request, pathParams, body);
+  return buildOperationArguments(
+    operationSpec,
+    request,
+    pathParams,
+    body,
+    route.schemas,
+  );
 }
 
 async function loadRequestBodyIfNeeded(
@@ -68,6 +76,7 @@ async function loadRequestBodyIfNeeded(
   if (!operationSpec.requestBody) return Promise.resolve();
 
   const contentType = getContentType(request);
+  debug('Loading request body with content type %j', contentType);
   if (contentType && !/json/.test(contentType)) {
     throw new HttpErrors.UnsupportedMediaType(
       `Content-type ${contentType} is not supported.`,
@@ -75,6 +84,7 @@ async function loadRequestBodyIfNeeded(
   }
 
   return await parseJsonBody(request).catch((err: HttpError) => {
+    debug('Cannot parse request body', err);
     err.statusCode = 400;
     throw err;
   });
@@ -84,7 +94,8 @@ function buildOperationArguments(
   operationSpec: OperationObject,
   request: Request,
   pathParams: PathParameterValues,
-  body?: MaybeBody,
+  body: MaybeBody,
+  globalSchemas: SchemasObject,
 ): OperationArgs {
   let requestBodyIndex: number = -1;
   if (operationSpec.requestBody) {
@@ -110,8 +121,10 @@ function buildOperationArguments(
     const coercedValue = coerceParameter(rawValue, spec);
     paramArgs.push(coercedValue);
   }
-  debug('start to validate requestBody...');
-  validateRequestBody(body, operationSpec.requestBody);
+
+  debug('Validating request body - value %j', body);
+  validateRequestBody(body, operationSpec.requestBody, globalSchemas);
+
   if (requestBodyIndex > -1) paramArgs.splice(requestBodyIndex, 0, body);
   return paramArgs;
 }

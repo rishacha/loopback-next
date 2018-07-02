@@ -4,39 +4,64 @@ import {
   RequestBodyObject,
   SchemaObject,
   isReferenceObject,
+  SchemasObject,
 } from '@loopback/openapi-v3-types';
 import * as debugModule from 'debug';
 import {RestHttpErrors} from '../coercion/rest-http-error';
+import {HttpErrors} from '..';
 const debug = debugModule('loopback:rest:validation');
 const util = require('util');
 
 export function validateRequestBody(
   // tslint:disable-next-line:no-any
   body: any,
-  requestBodySpec?: RequestBodyObject,
+  requestBodySpec: RequestBodyObject | undefined,
+  globalSchemas: SchemasObject,
 ) {
-  const schema = getRequestBodySchema(requestBodySpec);
+  if (requestBodySpec && requestBodySpec.required && body == undefined)
+    throw new HttpErrors.BadRequest('Request body is required');
+
+  const schema = getRequestBodySchema(requestBodySpec, globalSchemas);
   debug('schema from RequestBody is: %s', util.inspect(schema));
   if (!schema) return;
-  // @janny: We need to add the whole openapi spec in context
-  // otherwise `parseOperationArgs` only has access to the operation spec
-  // NOT openapiSpec.components.schemas
-  // Therefore I skip it as a workaround
-  if (isReferenceObject(schema)) return;
+
   const JSONSchema = convertToJSONSchema(schema);
   validateWithAJV(body, JSONSchema);
 }
 
-function getRequestBodySchema(requestBodySpec?: RequestBodyObject) {
+function getRequestBodySchema(
+  requestBodySpec: RequestBodyObject | undefined,
+  globalSchemas: SchemasObject,
+): SchemaObject | undefined {
   if (!requestBodySpec) return;
   const content = requestBodySpec.content;
-  return content[Object.keys(content)[0]].schema;
+  // FIXME(bajtos) we need to find the entry matching the content-type
+  // header from the incoming request (e.g. "application/json").
+  const schema = content[Object.keys(content)[0]].schema;
+  if (!schema || !isReferenceObject(schema)) {
+    return schema;
+  }
+
+  // A temporary solution for resolving schema references produced
+  // by @loopback/repository-json-schema. In the future, we should
+  // support arbitrary references anywhere in the OpenAPI spec.
+  // See https://github.com/strongloop/loopback-next/issues/435
+  const ref = schema.$ref;
+  const match = ref.match(/^#\/components\/schemas\/([^\/]+)$/);
+  if (!match) throw new Error(`Unsupported schema reference format: ${ref}`);
+  const schemaId = match[1];
+
+  debug(`Resolving schema reference ${ref} (schema id ${schemaId}).`);
+  if (!(schemaId in globalSchemas)) {
+    throw new Error(`Invalid reference ${ref} - schema ${schemaId} not found.`);
+  }
+  return globalSchemas[schemaId];
 }
 
 function convertToJSONSchema(schema: SchemaObject) {
   const JSONSchema = toJsonSchema(schema);
   delete JSONSchema['$schema'];
-  debug('convert to JSON schema %s', util.inspect(JSONSchema));
+  debug('Convert OpenAPI schema to JSON schema: %s', util.inspect(JSONSchema));
   return JSONSchema;
 }
 
@@ -50,10 +75,12 @@ function validateWithAJV(body: any, schema: any) {
   } catch (err) {
     isValid = false;
   }
-  debug('AJV validation is %s', isValid);
+  debug('AJV validation result: %s', isValid);
   if (!isValid) {
-    debug('AJV validation error: %s', util.inspect(ajv.errors));
+    debug('AJV validation errors: %s', util.inspect(ajv.errors));
     const err = ajv.errorsText(ajv.errors, {dataVar: body});
+    // FIXME add `err.details` object containing machine-readable information
+    // see LB 3.x ValidationError for inspiration
     throw RestHttpErrors.invalidRequestBody(body, err);
   }
 }
